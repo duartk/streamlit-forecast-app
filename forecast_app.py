@@ -41,6 +41,7 @@ if uploaded_file is not None:
     except Exception as e:
         print(e)
         # df = pd.read_csv(uploaded_file)
+        df = pd.read_excel(uploaded_file)
 
     columns_list = ['Regional', 'Link Type Engenharia', 'FREQUENCY', 'CONF', 'ANT TYPE', 'REUSO _ ANT A', 'ANT A',
                     'REUSO _ ANT B', 'ANT B', 'ANT SD A', 'ANT SD B']
