@@ -60,13 +60,14 @@ if uploaded_file is not None:
     df['Status Project'] = df['Status Project'].str.upper()
     df['Link Type Engenharia'] = df['Link Type Engenharia'].str.upper()
 
-    # Analise escopo Links
-    count_escopo = df.groupby(['Regional', 'Escopo', 'Status Instalacao']).size().reset_index(name='Count')
-
     # Filtro retirando links Instaldos, Cancelados e Reuso
     df1 = df[(df['Status Instalacao'] == "PENDENTE") & (df['Planning Status'] == "PLANNED")
              & (df['Status Project'] == "ON PROJECT") & (df['Link Type Engenharia'] != "REUSO")]
     df1 = df1.fillna('')
+
+    # Analise escopo Links
+    count_escopo = df1.groupby(['Regional', 'Escopo',
+                               'Status Instalacao']).size().reset_index(name='Count')
 
     # Sinalizando Links não analisados
     df['Analisado'] = df['SIAE ID'].isin(df1['SIAE ID'])
@@ -201,7 +202,8 @@ if uploaded_file is not None:
         st.write(f'* {links_analisados[False]} links não analisados.')
         st.write('Links com Status de instalação finalizado, links com status de planejamento'
                  ' cancelado e links com escopo de Reuso são desconsiderados da análise final.')
-
+    if st.checkbox('Show Raw Data'):
+        st.write(df)
 
     # Links
     st.subheader('Resumo Links:')
@@ -213,7 +215,7 @@ if uploaded_file is not None:
     st.pyplot()
 
     if st.checkbox('Show Link Table'):
-        st.write(equipamento_link)
+        st.write(count_escopo)
 
     # Antenas
     st.subheader('Resumo Antenas:')
@@ -261,3 +263,8 @@ if uploaded_file is not None:
     st.pyplot()
     if st.checkbox('Show IDUs Table'):
         st.write(resumo_idus)
+
+    # Equipamento por Link
+    st.subheader('Resumo Equipamento por Link:')
+    st.write('Quantidade de IDUs, ODUs e Antenas para cada Link.')
+    st.write(equipamento_link)
