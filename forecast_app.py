@@ -75,8 +75,12 @@ if uploaded_file is not None:
 
 
     # Preparando o DataFrames para análise de odus
-    ajuste_odu = {'1 or 2': '1', '2 or 3': '2', '1 or 4': '1', '2 or 4': '2', '3 or 4': '3'}
-    df1 = df1.replace(ajuste_odu)
+    ajuste_odu = {'1.0': '1', '2.0': '2', '3.0': '3', '4.0': '4',
+              '1 or 2': '1', '2 or 3': '2', '1 or 4': '1', '2 or 4': '2', '3 or 4': '3'}
+    for i in range(1, 9):
+        df1[f'CH{i} - SBB'] = df1[f'CH{i} - SBB'].astype('str')
+        df1[f'CH{i} - SBB'] = df1[f'CH{i} - SBB'].replace(ajuste_odu)
+
     df1['ODU TYPE'] = df1['ODU TYPE'].replace({'ASN/ASNK': 'ASNK'})
 
     # Analisando cada linha do data frame
@@ -92,6 +96,7 @@ if uploaded_file is not None:
             else:
                 odus.append('')
 
+        print(odus)
         lista_check = ['5', '6L', '6U', '7', '8', '8.5', '7/8', '7/8.5', '8/8.5']
         if df1.loc[i, 'BW'] == 56 and df1.loc[i, 'FREQUENCY'] in lista_check:
             odus[1] = ''
