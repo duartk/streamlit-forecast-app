@@ -30,7 +30,7 @@ def get_table_download_link(df, df1, df2, df3, df4, df5):
     """
     val = to_excel(df, df1, df2, df3, df4, df5)
     b64 = base64.b64encode(val)  # val looks like b'...'
-    return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="Forecast.xlsx">Download file</a>'
+    return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="Export_forecast.xlsx">Download file</a>'
     # decode b'abc' => abc
     # PS: pip install xlsxwriter  # pandas need this
 
@@ -197,7 +197,7 @@ if uploaded_file is not None:
     st.sidebar.subheader("Export to Excel")
 
     # Gerando o link para download do relatório
-    st.sidebar.markdown(get_table_download_link(df1, count_escopo, equipamento_link, resumo_idus,
+    st.sidebar.markdown(get_table_download_link(df, count_escopo, equipamento_link, resumo_idus,
                                         resumo_odus, resumo_antenas), unsafe_allow_html=True)
 
     # Links analisados
