@@ -6,11 +6,11 @@ import seaborn as sns
 import base64
 from io import BytesIO
 
-
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
+
 # Exportando os relatórios Excel
-def to_excel(df, df1, df2, df3, df4, df5):
+def to_excel(df, df1, df2, df3, df4, df5, df6):
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
     df.to_excel(writer, sheet_name='Links', index=False)
@@ -19,26 +19,28 @@ def to_excel(df, df1, df2, df3, df4, df5):
     df3.to_excel(writer, sheet_name='Resumo_IDUs', index=False)
     df4.to_excel(writer, sheet_name='Resumo_ODUs', index=False)
     df5.to_excel(writer, sheet_name='Resumo_Antenas', index=False)
+    df6.to_excel(writer, sheet_name='Resumo_Config', index=False)
     writer.save()
     processed_data = output.getvalue()
     return processed_data
 
-def get_table_download_link(df, df1, df2, df3, df4, df5):
+
+def get_table_download_link(df, df1, df2, df3, df4, df5, df6):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
     in:  dataframe
     out: href string
     """
-    val = to_excel(df, df1, df2, df3, df4, df5)
+    val = to_excel(df, df1, df2, df3, df4, df5, df6)
     b64 = base64.b64encode(val)  # val looks like b'...'
-    return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="Export_forecast.xlsx">Download file</a>'
-    # decode b'abc' => abc
-    # PS: pip install xlsxwriter  # pandas need this
+    return f'<a href="data:application/octet-stream;base64,{b64.decode()}' \
+           f'" download="Export_forecast.xlsx">Download file</a>'
+
 
 @st.cache
-def load_data(uploaded_file):
+def load_data(file):
     """Function for loading data"""
-    df = pd.read_excel(uploaded_file)
-    return df
+    df_file = pd.read_excel(uploaded_file)
+    return df_file
 
 
 # title for the app
@@ -59,24 +61,30 @@ if uploaded_file is not None:
     df['Planning Status'] = df['Planning Status'].str.upper()
     df['Status Project'] = df['Status Project'].str.upper()
     df['Link Type Engenharia'] = df['Link Type Engenharia'].str.upper()
+    df = df.astype({'ANT A': 'float', 'ANT B': 'float', 'ANT SD A': 'float', 'ANT SD B': 'float'})
 
-    # Filtro retirando links Instaldos, Cancelados e Reuso
+
+    # Filtro retirando links Instalados, Cancelados e Reuso
     df1 = df[(df['Status Instalacao'] == "PENDENTE") & (df['Planning Status'] == "PLANNED")
              & (df['Status Project'] == "ON PROJECT") & (df['Link Type Engenharia'] != "REUSO")]
     df1 = df1.fillna('')
 
     # Analise escopo Links
     count_escopo = df1.groupby(['Regional', 'Escopo',
-                               'Status Instalacao']).size().reset_index(name='Count')
+                                'Status Instalacao']).size().reset_index(name='Count')
+
+    # Analise config Links
+    count_config = df1.groupby('CONF').size().reset_index(name='Count')
 
     # Sinalizando Links não analisados
     df['Analisado'] = df['SIAE ID'].isin(df1['SIAE ID'])
     links_analisados = df['Analisado'].value_counts()
 
-
     # Preparando o DataFrames para análise de odus
-    ajuste_odu = {'1.0': '1', '2.0': '2', '3.0': '3', '4.0': '4',
-              '1 or 2': '1', '2 or 3': '2', '1 or 4': '1', '2 or 4': '2', '3 or 4': '3'}
+    ajuste_odu = {'1.0': '1', '2.0': '2', '3.0': '3', '4.0': '4', '1 or 2': '1', '2 or 3': '2',
+                  '1 or 4': '1', '2 or 4': '2', '3 or 4': '3', 'ch 1': 'ch1', 'ch 2': 'ch2', 'ch 3': 'ch3',
+                  'ch 4': 'ch4', 'ch 5': 'ch5', 'ch 6': 'ch6', 'ch 7': 'ch7', 'ch 8': 'ch8'}
+
     for i in range(1, 9):
         df1[f'CH{i} - SBB'] = df1[f'CH{i} - SBB'].astype('str')
         df1[f'CH{i} - SBB'] = df1[f'CH{i} - SBB'].replace(ajuste_odu)
@@ -96,8 +104,9 @@ if uploaded_file is not None:
             else:
                 odus.append('')
 
-        print(odus)
+
         lista_check = ['5', '6L', '6U', '7', '8', '8.5', '7/8', '7/8.5', '8/8.5']
+
         if df1.loc[i, 'BW'] == 56 and df1.loc[i, 'FREQUENCY'] in lista_check:
             odus[1] = ''
             odus[3] = ''
@@ -108,19 +117,23 @@ if uploaded_file is not None:
         df1.loc[i, 'Sbb2'] = odus.count('2')
         df1.loc[i, 'Sbb3'] = odus.count('3')
         df1.loc[i, 'Sbb4'] = odus.count('4')
-        df1.loc[i, 'ch1'] = odus.count('ch 1')
-        df1.loc[i, 'ch2'] = odus.count('ch 2')
-        df1.loc[i, 'ch3'] = odus.count('ch 3')
-        df1.loc[i, 'ch4'] = odus.count('ch 4')
-        df1.loc[i, 'ch5'] = odus.count('ch 5')
-        df1.loc[i, 'ch6'] = odus.count('ch 6')
-        df1.loc[i, 'ch7'] = odus.count('ch 7')
-        df1.loc[i, 'ch8'] = odus.count('ch 8')
+        df1.loc[i, 'ch1'] = odus.count('ch1')
+        df1.loc[i, 'ch2'] = odus.count('ch2')
+        df1.loc[i, 'ch3'] = odus.count('ch3')
+        df1.loc[i, 'ch4'] = odus.count('ch4')
+        df1.loc[i, 'ch5'] = odus.count('ch5')
+        df1.loc[i, 'ch6'] = odus.count('ch6')
+        df1.loc[i, 'ch7'] = odus.count('ch7')
+        df1.loc[i, 'ch8'] = odus.count('ch8')
 
         # Info Antenas
         antenas = []
         lista_str = ['A', 'B', 'SD A', 'SD B']
         for n in range(4):
+
+            # Substitui diâmetro 0.9 para 1m:
+            if df1.loc[i, f'ANT {lista_str[n]}'] == 0.9:
+                df1.loc[i, f'ANT {lista_str[n]}'] = 1
 
             if df1.loc[i, f'REUSO _ ANT {lista_str[n][-1]}'] == 'NO':
                 antenas.append(df1.loc[i, f'ANT {lista_str[n]}'])
@@ -174,6 +187,7 @@ if uploaded_file is not None:
          'ch5', 'ch6', 'ch7', 'ch8']].sum().reset_index()
     resumo_odus = resumo_odus.drop(resumo_odus[resumo_odus.iloc[:, 2:].sum(axis=1) == 0].index)
     resumo_odus.iloc[:, 2:] = resumo_odus.iloc[:, 2:].astype('int')
+    resumo_odus['Total'] = resumo_odus.sum(axis=1)
 
     # Resumo qtde de Antenas
     df_antenas = df1.copy()
@@ -197,8 +211,8 @@ if uploaded_file is not None:
     st.sidebar.subheader("Export to Excel")
 
     # Gerando o link para download do relatório
-    st.sidebar.markdown(get_table_download_link(df, count_escopo, equipamento_link, resumo_idus,
-                                        resumo_odus, resumo_antenas), unsafe_allow_html=True)
+    st.sidebar.markdown(get_table_download_link(df, count_escopo, equipamento_link, resumo_idus, resumo_odus,
+                                                resumo_antenas, count_config), unsafe_allow_html=True)
 
     # Links analisados
     st.subheader(f'Total de {len(df)} links carregados.')
