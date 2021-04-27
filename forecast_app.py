@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 import base64
 from io import BytesIO
@@ -39,7 +38,7 @@ def get_table_download_link(df, df1, df2, df3, df4, df5, df6):
 @st.cache
 def load_data(file):
     """Function for loading data"""
-    df_file = pd.read_excel(uploaded_file)
+    df_file = pd.read_excel(file)
     return df_file
 
 
@@ -62,7 +61,9 @@ if uploaded_file is not None:
     df['Status Project'] = df['Status Project'].str.upper()
     df['Link Type Engenharia'] = df['Link Type Engenharia'].str.upper()
     df = df.astype({'ANT A': 'float', 'ANT B': 'float', 'ANT SD A': 'float', 'ANT SD B': 'float'})
-
+    for i in df[df['HW A - MODEL'] == 'AGS20L']['IDU A - GAI'].index:
+        df.loc[i, 'IDU A - GAI'] = 'AGS20L'
+        df.loc[i, 'IDU B - GAI'] = 'AGS20L'
 
     # Filtro retirando links Instalados, Cancelados e Reuso
     df1 = df[(df['Status Instalacao'] == "PENDENTE") & (df['Planning Status'] == "PLANNED")
@@ -96,6 +97,7 @@ if uploaded_file is not None:
 
         # Info ODUs
         odus = []
+        qtd_canais = 0
 
         for n in range(8):
 
@@ -104,14 +106,17 @@ if uploaded_file is not None:
             else:
                 odus.append('')
 
+            if df1.loc[i, f'CH{n + 1} - TXA'] != '':
+                qtd_canais += 1
 
         lista_check = ['5', '6L', '6U', '7', '8', '8.5', '7/8', '7/8.5', '8/8.5']
 
         if df1.loc[i, 'BW'] == 56 and df1.loc[i, 'FREQUENCY'] in lista_check:
-            odus[1] = ''
-            odus[3] = ''
-            odus[5] = ''
-            odus[7] = ''
+            if qtd_canais > int(df1.loc[i, 'CONF'][0]):
+                odus[1] = ''
+                odus[3] = ''
+                odus[5] = ''
+                odus[7] = ''
 
         df1.loc[i, 'Sbb1'] = odus.count('1')
         df1.loc[i, 'Sbb2'] = odus.count('2')
@@ -155,22 +160,13 @@ if uploaded_file is not None:
 
         for n in range(2):
 
-            if df1.loc[i, f'HW {lista_idu_str[n]} - MODEL'] == 'AGS20L':
-                df1.loc[i, f'IDU {lista_idu_str[n]} - GAI'] = 'AGS20L'
-
             if df1.loc[i, f'REUSO _ IDU {lista_idu_str[n]} - GAI'] == 'NO':
                 idus.append(df1.loc[i, f'IDU {lista_idu_str[n]} - GAI'])
             else:
-                antenas.append('')
+                idus.append('')
 
-        df1.loc[i, 'GAI0215'] = idus.count('GAI0215')
-        df1.loc[i, 'GAI0216'] = idus.count('GAI0216')
-        df1.loc[i, 'GAI0217'] = idus.count('GAI0217')
-        df1.loc[i, 'GAI0218'] = idus.count('GAI0218')
-        df1.loc[i, 'GAI0221'] = idus.count('GAI0221')
-        df1.loc[i, 'GAI0233'] = idus.count('GAI0233')
-        df1.loc[i, 'GAI0235'] = idus.count('GAI0235')
-        df1.loc[i, 'AGS20L'] = idus.count('AGS20L')
+        for idu in sorted(df1['IDU A - GAI'].unique()):
+            df1.loc[i, idu] = idus.count(idu)
 
     # Resumo qtde de Idus
     idu_A = df1[df1['REUSO _ IDU A - GAI'] == "NO"][{'HW A - MODEL', 'IDU A - GAI'}]
@@ -197,14 +193,15 @@ if uploaded_file is not None:
         ['0.3', '0.6', '1', '1.2', '1.8', '2.4', '3', '3.6']].sum().reset_index()
     resumo_antenas = resumo_antenas.drop(resumo_antenas[resumo_antenas.iloc[:, 2:].sum(axis=1) == 0].index)
     resumo_antenas.iloc[:, 2:] = resumo_antenas.iloc[:, 2:].astype('int')
+    resumo_antenas['Total'] = resumo_antenas.sum(axis=1)
 
     # Resumo de materiais por ID
     equipamento_link = df1.copy()
+    lista_idus = sorted(df1['IDU A - GAI'].unique())
     filtro = ['WBS', 'SIAE ID', 'Escopo', 'CONF', 'FREQUENCY', 'ODU TYPE', 'Sbb1', 'Sbb2', 'Sbb3', 'Sbb4', 'ch1', 'ch2',
               'ch3', 'ch4',
-              'ch5', 'ch6', 'ch7', 'ch8', 'ANT TYPE', '0.3', '0.6', '1', '1.2', '1.8', '2.4', '3', '3.6', 'GAI0215',
-              'GAI0216',
-              'GAI0217', 'GAI0218', 'GAI0221', 'GAI0233', 'GAI0235', 'AGS20L']
+              'ch5', 'ch6', 'ch7', 'ch8', 'ANT TYPE', '0.3', '0.6', '1', '1.2', '1.8', '2.4', '3', '3.6']
+    filtro.extend(lista_idus)
     equipamento_link = equipamento_link[filtro]
 
     # Conf Sidebar
@@ -231,17 +228,29 @@ if uploaded_file is not None:
     sns.set_theme(style="darkgrid")
     sns.catplot(x="Regional", y="Count", hue="Escopo", data=count_escopo,
                 kind="bar", palette='deep', legend_out=False)
+    plt.legend(loc='upper right', fontsize='xx-small')
     st.pyplot()
 
     if st.checkbox('Show Link Table'):
         st.write(count_escopo)
 
+    # Plot Config Links
+    sns.set_theme(style="darkgrid")
+    sns.catplot(x="CONF", y="Count", data=count_config,
+                kind="bar", palette='deep', legend_out=False)
+    st.pyplot()
+
+    if st.checkbox('Show Config Table'):
+        st.write(count_config)
+
     # Antenas
     st.subheader('Resumo Antenas:')
     st.write('Quantidade total de antenas por frequência e diâmetro.')
-    new_ant = resumo_antenas.melt(['FREQUENCY', 'ANT TYPE'], var_name='Diameter', value_name='Count')
+    plot_antenas = resumo_antenas.drop('Total', axis=1)
+    new_ant = plot_antenas.melt(['FREQUENCY', 'ANT TYPE'], var_name='Diameter', value_name='Count')
     sns.catplot(x="FREQUENCY", y="Count", hue="Diameter", data=new_ant,
                 kind="bar", palette='deep', legend_out=False)
+    plt.legend(loc='upper right', fontsize='x-small')
     st.pyplot()
 
     if st.checkbox('Show Antenna Table'):
@@ -250,26 +259,32 @@ if uploaded_file is not None:
     # ODUs
     st.subheader('Resumo ODUs:')
     st.write('Quantidade total de ODUs por frequência e SBB para cada modelo.')
-    new_odus = resumo_odus.melt(['FREQUENCY', 'ODU TYPE'], var_name='SubBanda', value_name='Count')
+    plot_odus = resumo_odus.drop('Total', axis=1)
+    new_odus = plot_odus.melt(['FREQUENCY', 'ODU TYPE'], var_name='SubBanda', value_name='Count')
 
     # Plot ASNK
     asnk = new_odus[(new_odus['ODU TYPE'] == "ASNK") & (new_odus['Count'] != 0)]
-    sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asnk, kind="bar",
-                legend_out=False, palette='deep').set(title='ODU TYPE = ASNK')
-    plt.legend(loc='upper right')
-    st.pyplot()
+    if len(asnk) >= 1:
+        sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asnk, kind="bar",
+                    legend_out=False, palette='deep').set(title='ODU TYPE = ASNK')
+        plt.legend(loc='upper right', fontsize='x-small')
+        st.pyplot()
 
     # Plot ASNKHP
     asnkhp = new_odus[(new_odus['ODU TYPE'] == "ASNKHP") & (new_odus['Count'] != 0)]
-    sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asnkhp, kind="bar",
-                legend_out=False, palette='deep').set(title='ODU TYPE = ASNKHP')
-    st.pyplot()
+    if len(asnkhp) >= 1:
+        sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asnkhp, kind="bar",
+                    legend_out=False, palette='deep').set(title='ODU TYPE = ASNKHP')
+        plt.legend(loc='upper right', fontsize='x-small')
+        st.pyplot()
 
     # Plot ASN
     asn = new_odus[(new_odus['ODU TYPE'] == "ASN") & (new_odus['Count'] != 0)]
-    sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asn, kind="bar",
-                legend_out=False, palette='deep').set(title='ODU TYPE = ASN')
-    st.pyplot()
+    if len(asn) >= 1:
+        sns.catplot(x="FREQUENCY", y="Count", hue="SubBanda", data=asn, kind="bar",
+                    legend_out=False, palette='deep').set(title='ODU TYPE = ASN')
+        plt.legend(loc='upper right', fontsize='x-small')
+        st.pyplot()
 
     if st.checkbox('Show ODUs Table'):
         st.write(resumo_odus)
